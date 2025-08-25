@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -10,9 +11,14 @@ import (
 )
 
 func setupDBMock() (sqlmock.Sqlmock, func()) {
-	mockDB, mock, _ := sqlmock.New()
-	db = mockDB
-	return mock, func() { db.Close() }
+	db, mock, err := sqlmock.New()
+	if err != nil {
+		panic("failed to create sqlmock: " + err.Error())
+	}
+
+	return mock, func() {
+		db.Close()
+	}
 }
 
 func TestCounterHandler_OK(t *testing.T) {
@@ -26,7 +32,8 @@ func TestCounterHandler_OK(t *testing.T) {
 	req := httptest.NewRequest(http.MethodPost, "/counter/1", nil)
 	rr := httptest.NewRecorder()
 	router := mux.NewRouter()
-	router.HandleFunc("/counter/{bannerID}", CounterHandler)
+	db, _, _ := sqlmock.New()
+	router.HandleFunc("/counter/{bannerID}", CounterHandler(db))
 	router.ServeHTTP(rr, req)
 
 	if rr.Code != http.StatusNoContent {
@@ -39,7 +46,8 @@ func TestCounterHandler_BadBannerID(t *testing.T) {
 	rr := httptest.NewRecorder()
 
 	router := mux.NewRouter()
-	router.HandleFunc("/counter/{bannerID}", CounterHandler)
+	db, _, _ := sqlmock.New()
+	router.HandleFunc("/counter/{bannerID}", CounterHandler(db))
 	router.ServeHTTP(rr, req)
 
 	if rr.Code != http.StatusBadRequest {
@@ -48,14 +56,14 @@ func TestCounterHandler_BadBannerID(t *testing.T) {
 }
 
 func TestCounterHandler_DBErrorBegin(t *testing.T) {
-	oldDB := db
-	defer func() { db = oldDB }()
-	db = nil
-
+	mock, cleanup := setupDBMock()
+	defer cleanup()
+	mock.ExpectBegin().WillReturnError(fmt.Errorf("DB error"))
 	req := httptest.NewRequest(http.MethodPost, "/counter/1", nil)
 	rr := httptest.NewRecorder()
 	router := mux.NewRouter()
-	router.HandleFunc("/counter/{bannerID}", CounterHandler)
+	db, _, _ := sqlmock.New()
+	router.HandleFunc("/counter/{bannerID}", CounterHandler(db))
 	router.ServeHTTP(rr, req)
 
 	if rr.Code != http.StatusInternalServerError {
