@@ -14,7 +14,7 @@ import (
 )
 
 func TestStatsHandler_OK(t *testing.T) {
-	mock, cleanup := setupDBMock()
+	db, mock, cleanup := setupDBMock()
 	defer cleanup()
 
 	rows := sqlmock.NewRows([]string{"ts", "cnt"}).
@@ -27,7 +27,6 @@ func TestStatsHandler_OK(t *testing.T) {
 	req := httptest.NewRequest(http.MethodPost, "/stats/1", strings.NewReader(payload))
 	rr := httptest.NewRecorder()
 	router := mux.NewRouter()
-	db, _, _ := sqlmock.New()
 	router.HandleFunc("/stats/{bannerID}", StatsHandler(db))
 	router.ServeHTTP(rr, req)
 

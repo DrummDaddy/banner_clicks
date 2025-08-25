@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"database/sql"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
@@ -10,19 +11,19 @@ import (
 	"github.com/gorilla/mux"
 )
 
-func setupDBMock() (sqlmock.Sqlmock, func()) {
+func setupDBMock() (*sql.DB, sqlmock.Sqlmock, func()) {
 	db, mock, err := sqlmock.New()
 	if err != nil {
 		panic("failed to create sqlmock: " + err.Error())
 	}
 
-	return mock, func() {
+	return db, mock, func() {
 		db.Close()
 	}
 }
 
 func TestCounterHandler_OK(t *testing.T) {
-	mock, cleanup := setupDBMock()
+	db, mock, cleanup := setupDBMock()
 
 	defer cleanup()
 	mock.ExpectBegin()
@@ -32,7 +33,6 @@ func TestCounterHandler_OK(t *testing.T) {
 	req := httptest.NewRequest(http.MethodPost, "/counter/1", nil)
 	rr := httptest.NewRecorder()
 	router := mux.NewRouter()
-	db, _, _ := sqlmock.New()
 	router.HandleFunc("/counter/{bannerID}", CounterHandler(db))
 	router.ServeHTTP(rr, req)
 
@@ -56,13 +56,12 @@ func TestCounterHandler_BadBannerID(t *testing.T) {
 }
 
 func TestCounterHandler_DBErrorBegin(t *testing.T) {
-	mock, cleanup := setupDBMock()
+	db, mock, cleanup := setupDBMock()
 	defer cleanup()
 	mock.ExpectBegin().WillReturnError(fmt.Errorf("DB error"))
 	req := httptest.NewRequest(http.MethodPost, "/counter/1", nil)
 	rr := httptest.NewRecorder()
 	router := mux.NewRouter()
-	db, _, _ := sqlmock.New()
 	router.HandleFunc("/counter/{bannerID}", CounterHandler(db))
 	router.ServeHTTP(rr, req)
 
