@@ -20,6 +20,11 @@ func CounterHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if db == nil {
+		http.Error(w, "DB error", http.StatusInternalServerError)
+		return
+	}
+
 	now := time.Now().UTC().Truncate(time.Minute)
 
 	tx, err := db.Begin()
